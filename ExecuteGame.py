@@ -9,13 +9,32 @@ from sys import exit
 #important vars
 WIDTH = 1300
 HEIGHT = 800
+TOPBOUND = 70
 FPS = 60
 pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-
+UICENTERY = 40
 #Action vars
 shoot = False
 thrustersOn = False
+
+#Bullet
+purpleBullet = pygame.image.load("Images\dripBall.png").convert_alpha()
+blueBullet = pygame.image.load("Images\spaceshipBall.png").convert_alpha()
+blueBulletRect = blueBullet.get_rect(center =  (380, UICENTERY))
+
+#font
+fontSize = 50
+gameFont = pygame.font.Font('Fonts\AudiowideFont.ttf', fontSize)
+startTime = 0
+
+#heart
+heartImg = pygame.image.load('Images\heart.png').convert_alpha()
+heartRect = heartImg.get_rect(center = (100, UICENTERY))
+
+#fuel
+fuelImg = pygame.image.load('Images\FuelCanister.png').convert_alpha()
+fuelRect = fuelImg.get_rect(center = (600, UICENTERY))
 
 #Groups
 bulletGroup = pygame.sprite.Group()
@@ -57,14 +76,18 @@ class SpaceShip(pygame.sprite.Sprite):
         self.velocity = 0
         self.damping = .8
         self.thrust = 8
+        self.fuel = 10000
+        self.fuelUsage = 2
 
         #initiate hitbox/rect
         self.rect = self.image.get_rect(center = (200, 100))
 
     def update(self):
+        global startTime
         if(self.health <=0):
             self.kill()
             self.alive = False
+            startTime = int (pygame.time.get_ticks()/ 1000) ## when making restart game function this will be how to reset the time
 
         #movement
         if thrustersOn:
@@ -85,16 +108,20 @@ class SpaceShip(pygame.sprite.Sprite):
         #bounds spaceship
         if self.rect.bottom>= HEIGHT:
             self.rect.bottom = HEIGHT
-        elif self.rect.top <= 0:
-            self.rect.top = 0
+            if self.health>0:
+                self.health -=1
+        elif self.rect.top <= TOPBOUND:
+            self.rect.top = TOPBOUND
         
     def MoveUp(self):
-       self.velocity -= self.thrust
+        if self.fuel>=0:
+            self.velocity -= self.thrust
+            self.fuel -= self.fuelUsage
 
     def shoot(self):
         if self.shootCD == 0 and self.ammo>0:
             self.shootCD = 20
-            bullet = Bullet(self.rect.right+14, self.rect.centery, self.direction)
+            bullet = Bullet(self.rect.right+14, self.rect.centery, self.direction, blueBullet)
             bulletGroup.add(bullet)
             self.ammo-=1
             
@@ -103,10 +130,10 @@ class SpaceShip(pygame.sprite.Sprite):
 
 class Bullet(pygame.sprite.Sprite):
 
-    def __init__(self, x, y, direction):
+    def __init__(self, x, y, direction, image):
         super().__init__()
         self.speed = 10
-        self.image = pygame.image.load("Images\dripBall.png").convert_alpha()
+        self.image = image
         self.rect = self.image.get_rect()
         self.rect.center = (x,y)
         self.direction = direction
@@ -136,15 +163,13 @@ class Bullet(pygame.sprite.Sprite):
 
 class Enemy(pygame.sprite.Sprite):
 
-    def __init__(self, image, health, speed,x,y, shootCD):
+    def __init__(self, image, health, speed, x, y):
         super().__init__()
         self.image = image
         self.rect = self.image.get_rect()
         self.rect.center = (x,y)
         self.health = health
         self.speed = speed
-        self.shootCD = shootCD
-        self.startShootcd = shootCD
         self.alive = TRUE
         self.direction = -1
     
@@ -157,38 +182,25 @@ class Enemy(pygame.sprite.Sprite):
         if self.health<=0:
             self.alive = False
             self.kill()
+            
 
-        if self.alive:
-            self.shoot()
     
 
-    def shoot(self):
-        if self.shootCD == 0:
-            self.shootCD = self.startShootcd
-            bullet = Bullet(self.rect.left-15, self.rect.bottom - 40, self.direction)
-            bulletGroup.add(bullet)
             
             
 class DripGuy(Enemy):
 
     def __init__(self, image, health, speed,x,y, shootCD):
-        super().__init__(image, health, speed,x,y, shootCD)
+        super().__init__(image, health, speed,x,y)
         self.goingUp = False
         self.goingDown = True
+        self.shootCD = shootCD
+        self.startShootcd = shootCD
 
     def update(self):
         
-        if(self.goingDown and self.rect.y < HEIGHT-100):
-            self.rect.y += self.speed
-        else:
-            self.goingDown = False
-            self.goingUp = True
-
-        if(self.goingUp and self.rect.y > 100):
-            self.rect.y -= self.speed
-        else:
-            self.goingDown = True
-            self.goingUp = False
+        #movement
+        self.movement()
 
         #decreases shot cooldown
         if self.shootCD>0:
@@ -201,12 +213,26 @@ class DripGuy(Enemy):
 
         if self.alive:
             self.shoot()
+
+
+    def movement(self):
+        if(self.goingDown and self.rect.y < HEIGHT-100):
+            self.rect.y += self.speed
+        else:
+            self.goingDown = False
+            self.goingUp = True
+
+        if(self.goingUp and self.rect.y > 100):
+            self.rect.y -= self.speed
+        else:
+            self.goingDown = True
+            self.goingUp = False
     
 
     def shoot(self):
         if self.shootCD == 0:
             self.shootCD = self.startShootcd
-            bullet = Bullet(self.rect.left-15, self.rect.bottom - 40, self.direction)
+            bullet = Bullet(self.rect.left-15, self.rect.bottom - 40, self.direction, purpleBullet)
             bulletGroup.add(bullet)
 
 #spaceship
@@ -220,6 +246,12 @@ dripDude =  DripGuy(dripDudeImg, 200, 8, WIDTH -200, HEIGHT -300, 20)
 
 EnemiesGroup = pygame.sprite.Group()
 EnemiesGroup.add(dripDude)
+
+#method for displaying the time passed
+def displayInfo(x, y, info): 
+    timeSurf = gameFont.render(f'{info}', False, 'White')
+    timeRect = timeSurf.get_rect(center = (x,y))
+    screen.blit(timeSurf, timeRect)
 
 #method for event handling
 def eventLoop():
@@ -245,7 +277,6 @@ def eventLoop():
                 shoot = False
 
 
-
 #Main gameplay loop
 gameOver = False
 while not gameOver:
@@ -261,12 +292,27 @@ while not gameOver:
         scroll = 0
     scroll -= 5
 
+    #displays information
+    #displayInfo(100,40, int (pygame.time.get_ticks()/ 1000) - startTime) # displays the time in seconds
+    
+    #displays health
+    screen.blit(heartImg, heartRect)
+    displayInfo(200, UICENTERY, spaceship.health)
+
+    #display ammo
+    screen.blit(blueBullet, blueBulletRect)
+    displayInfo(445, UICENTERY, spaceship.ammo)
+
+    #display fuel
+    screen.blit(fuelImg, fuelRect)
+    displayInfo(710, UICENTERY, spaceship.fuel)
+
     #update and draw groups
 
     #spaceship group
     spaceshipGroup.update() 
     spaceshipGroup.draw(screen)
-   
+    
     #enemies
     EnemiesGroup.update()
     EnemiesGroup.draw(screen)
