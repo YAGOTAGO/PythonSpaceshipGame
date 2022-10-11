@@ -28,7 +28,7 @@ blueBullet = pygame.image.load("Images\spaceshipBall.png").convert_alpha()
 blueBulletRect = blueBullet.get_rect(center =  (380, UICENTERY))
 
 #ammo
-ammoAmount = 30
+ammoAmount = 15 # amoung given when collected
 ammoCD = 300 #start of game cd
 maxAmmoCD = 160 # cd after first spawn
 ammoImg = pygame.image.load('Images\drip.png').convert_alpha()
@@ -65,6 +65,9 @@ maxHeartCD = 700 # cd after first spawn
 #fuel
 fuelImg = pygame.image.load('Images\FuelCanister.png').convert_alpha()
 fuelRect = fuelImg.get_rect(center = (600, UICENTERY))
+fuelRecoverAmount = 1000
+fuelCD = 2000
+maxFuelCd = 2000
 
 #Groups
 bulletGroup = pygame.sprite.Group()
@@ -353,6 +356,21 @@ class Heart(NonAnimCollectables):
         self.collide()
         self.move()
 
+#fuel group
+fuelGroup = pygame.sprite.Group()
+
+class Fuel(NonAnimCollectables):
+    def __init__(self, image):
+        super().__init__(image)
+ 
+    def collide(self):
+        if pygame.sprite.spritecollide(spaceship, fuelGroup, True): 
+            spaceship.fuel += fuelRecoverAmount
+    
+    def update(self):
+        self.collide()
+        self.move()
+
 
 #Enemies
 dripDudeImg = pygame.image.load("Images\dripGuy.png").convert_alpha()
@@ -389,7 +407,14 @@ def spawnHeart():
     else:
         heartCD -= 1
 
-
+def spawnFuel():
+    global fuelCD
+    if fuelCD == 0:
+        fuel = Fuel(fuelImg)
+        fuelGroup.add(fuel)
+        fuelCD = maxFuelCd
+    else:
+        fuelCD -= 1
 
 #method for displaying the time passed
 def displayInfo(x, y, info): 
@@ -440,19 +465,19 @@ while not gameOver:
     #displays information
     #displayInfo(100,40, int (pygame.time.get_ticks()/ 1000) - startTime) # displays the time in seconds
     
-    #displays health
+    #displays health UI
     screen.blit(heartImg, heartRect)
     displayInfo(200, UICENTERY, spaceship.health)
 
-    #display ammo
+    #display ammo UI
     screen.blit(blueBullet, blueBulletRect)
     displayInfo(445, UICENTERY, spaceship.ammo)
 
-    #display fuel
+    #display fuel UI
     screen.blit(fuelImg, fuelRect)
     displayInfo(710, UICENTERY, spaceship.fuel)
 
-    #display score
+    #display score UI
     screen.blit(coin1, coin1Rect)
     displayInfo(1100, UICENTERY, spaceship.score)
 
@@ -477,16 +502,18 @@ while not gameOver:
     ammoGroup.update()
     ammoGroup.draw(screen)
 
+    #fuel
+    spawnFuel()
+    fuelGroup.update()
+    fuelGroup.draw(screen)
+
     #enemies
     EnemiesGroup.update()
     EnemiesGroup.draw(screen)
 
-    
-
     #bullet group
     bulletGroup.update()
     bulletGroup.draw(screen)
-
 
     pygame.display.update() #maintains display open
     clock.tick(FPS) #sets fram rate to 60
