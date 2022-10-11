@@ -1,1 +1,1 @@
-# Drip World returns with arcade like infinite runner
+# Drip World returns with infinite runner, coded using Python
