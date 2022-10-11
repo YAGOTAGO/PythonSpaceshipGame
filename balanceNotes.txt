@@ -1,0 +1,25 @@
+
+Player:
+
+SpaceShip:
+Health: 500 hp
+Start Ammo: 50 ammo
+Start Fuel: 10,000
+Fuel Usage: 2 / frames where space is pressed
+
+
+Collectables:
+
+Hearts:
+Recover: 100 hp
+Take 1000 frames (16.7 seconds) to appear
+Take 700 frames (11.7 seconds) to appear afterwards
+
+Ammo:
+Recover: 15 ammo
+Take 300 frames (5 sec) to appear first time
+Take 160 (2.7 sec) afterwards
+
+Fuel:
+Recover: 1000 fuel
+Take 2000 frames (33.3 sec) for first appearance, and onwards
