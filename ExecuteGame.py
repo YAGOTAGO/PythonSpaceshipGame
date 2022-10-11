@@ -1,8 +1,5 @@
-from operator import truediv
 from pickle import TRUE
-from tkinter import Y
-from tokenize import group
-from turtle import back, width
+from random import randint
 import pygame
 from sys import exit
 
@@ -14,6 +11,13 @@ FPS = 60
 pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 UICENTERY = 40
+
+#spawn vars
+SPAWNX = WIDTH + 100
+SPWANY1 = TOPBOUND+50
+SPAWNY2 = HEIGHT-50
+COLLECTABLESMOVESPEED = 6
+
 #Action vars
 shoot = False
 thrustersOn = False
@@ -23,14 +27,40 @@ purpleBullet = pygame.image.load("Images\dripBall.png").convert_alpha()
 blueBullet = pygame.image.load("Images\spaceshipBall.png").convert_alpha()
 blueBulletRect = blueBullet.get_rect(center =  (380, UICENTERY))
 
+#ammo
+ammoAmount = 30
+ammoCD = 300 #start of game cd
+maxAmmoCD = 160 # cd after first spawn
+ammoImg = pygame.image.load('Images\drip.png').convert_alpha()
+
 #font
 fontSize = 50
 gameFont = pygame.font.Font('Fonts\AudiowideFont.ttf', fontSize)
 startTime = 0
 
-#heart
+#coins images
+coin1 = pygame.image.load('Images\coins\Gold1.png').convert_alpha()
+coin2 = pygame.image.load('Images\coins\Gold2.png').convert_alpha()
+coin3 = pygame.image.load('Images\coins\Gold3.png').convert_alpha()
+coin4 = pygame.image.load('Images\coins\Gold4.png').convert_alpha()
+coin5 = pygame.image.load('Images\coins\Gold5.png').convert_alpha()
+coin6 = pygame.image.load('Images\coins\Gold6.png').convert_alpha()
+coin7 = pygame.image.load('Images\coins\Gold7.png').convert_alpha()
+coin8 = pygame.image.load('Images\coins\Gold8.png').convert_alpha()
+coin9 = pygame.image.load('Images\coins\Gold9.png').convert_alpha()
+coin10 = pygame.image.load('Images\coins\Gold10.png').convert_alpha()
+coin1Rect = coin1.get_rect(center = (1000, UICENTERY)) #positions coin icon for score
+coinCD = 0
+maxCoinCD = 40
+
+#heart for UI
 heartImg = pygame.image.load('Images\heart.png').convert_alpha()
 heartRect = heartImg.get_rect(center = (100, UICENTERY))
+
+#heart for collectible
+healthRecoverAmount = 100
+heartCD = 1000 #start of game cd
+maxHeartCD = 700 # cd after first spawn
 
 #fuel
 fuelImg = pygame.image.load('Images\FuelCanister.png').convert_alpha()
@@ -71,6 +101,9 @@ class SpaceShip(pygame.sprite.Sprite):
         self.startAmmo = 50
         self.ammo = self.startAmmo
 
+        #score/coins
+        self.score = 0
+
         #movement var
         self.gravity = 3
         self.velocity = 0
@@ -109,7 +142,7 @@ class SpaceShip(pygame.sprite.Sprite):
         if self.rect.bottom>= HEIGHT:
             self.rect.bottom = HEIGHT
             if self.health>0:
-                self.health -=1
+                self.health -= 2 #loses health when touching the ground
         elif self.rect.top <= TOPBOUND:
             self.rect.top = TOPBOUND
         
@@ -127,6 +160,12 @@ class SpaceShip(pygame.sprite.Sprite):
             
 
 #end of spaceship class
+
+#spaceship group
+spaceship = SpaceShip()
+spaceshipGroup = pygame.sprite.GroupSingle()
+spaceshipGroup.add(spaceship)
+
 
 class Bullet(pygame.sprite.Sprite):
 
@@ -155,9 +194,7 @@ class Bullet(pygame.sprite.Sprite):
             if dripDude.alive:
                 self.kill() #destroy bullet
                 dripDude.health -= 50
-        
-
-    
+           
 #end of bullet class
 
 
@@ -183,10 +220,7 @@ class Enemy(pygame.sprite.Sprite):
             self.alive = False
             self.kill()
             
-
-    
-
-            
+           
             
 class DripGuy(Enemy):
 
@@ -234,11 +268,91 @@ class DripGuy(Enemy):
             self.shootCD = self.startShootcd
             bullet = Bullet(self.rect.left-15, self.rect.bottom - 40, self.direction, purpleBullet)
             bulletGroup.add(bullet)
+#end of dripguy class
 
-#spaceship
-spaceship = SpaceShip()
-spaceshipGroup = pygame.sprite.GroupSingle()
-spaceshipGroup.add(spaceship)
+#coins
+coinGroup = pygame.sprite.Group()
+
+class Coin(pygame.sprite.Sprite):
+
+    def __init__(self):
+        super().__init__()
+        self.frames = [coin1, coin2, coin3, coin4, coin5, coin6, coin7, coin8, coin9, coin10]
+        self.index = 0
+        self.image = self.frames[self.index]
+        self.rect = self.image.get_rect(center = (SPAWNX, randint(SPWANY1, SPAWNY2))) #center off screen and random y
+        self.moveSpeed = COLLECTABLESMOVESPEED
+        self.animSpeed = .1
+    
+    def move(self):
+        #destroy if off screen otherwise move it fowards
+        if(self.rect.x < -100):
+            self.kill()
+        else:
+            self.rect.x -= self.moveSpeed
+
+    def anim(self):
+        self.index += self.animSpeed
+        if self.index >= len(self.frames): self.index = 0
+        self.image = self.frames[int(self.index)]
+
+    def collide(self):
+        if pygame.sprite.spritecollide(spaceship, coinGroup, True):
+            spaceship.score += 100
+
+    def update(self):
+        self.collide()
+        self.move()
+        self.anim()
+
+
+class NonAnimCollectables(pygame.sprite.Sprite):
+    def __init__(self, image):
+        super().__init__()
+        self.image = image
+        self.rect = self.image.get_rect(center = (SPAWNX, randint(SPWANY1, SPAWNY2)))
+        self.moveSpeed = COLLECTABLESMOVESPEED
+
+    def move(self):
+        #destroy if off screen otherwise move it fowards
+        if(self.rect.x < -100):
+            self.kill()
+        else:
+            self.rect.x -= self.moveSpeed
+    
+
+#ammo group
+ammoGroup = pygame.sprite.Group()
+
+class Ammo(NonAnimCollectables):
+
+    def __init__(self, image):
+        super().__init__(image)
+ 
+    def collide(self):
+        if pygame.sprite.spritecollide(spaceship, ammoGroup, True): 
+            spaceship.ammo += ammoAmount
+
+    def update(self):
+        self.collide()
+        self.move()
+
+
+#heart group
+heartGroup = pygame.sprite.Group()
+
+class Heart(NonAnimCollectables):
+    def __init__(self, image):
+        super().__init__(image)
+ 
+    def collide(self):
+        if pygame.sprite.spritecollide(spaceship, heartGroup, True): 
+            spaceship.health += healthRecoverAmount
+    
+    def update(self):
+        self.collide()
+        self.move()
+
 
 #Enemies
 dripDudeImg = pygame.image.load("Images\dripGuy.png").convert_alpha()
@@ -247,16 +361,47 @@ dripDude =  DripGuy(dripDudeImg, 200, 8, WIDTH -200, HEIGHT -300, 20)
 EnemiesGroup = pygame.sprite.Group()
 EnemiesGroup.add(dripDude)
 
+
+def spawnCoin():
+    global coinCD
+    if coinCD == 0:
+        coin = Coin()
+        coinGroup.add(coin)
+        coinCD = maxCoinCD
+    else:
+        coinCD-=1
+
+def spawnAmmo():
+    global ammoCD   
+    if ammoCD == 0:
+        ammo = Ammo(ammoImg)
+        ammoGroup.add(ammo)
+        ammoCD = maxAmmoCD
+    else:
+        ammoCD -= 1
+
+def spawnHeart():
+    global heartCD
+    if heartCD == 0:
+        heart = Heart(heartImg)
+        heartGroup.add(heart)
+        heartCD = maxHeartCD
+    else:
+        heartCD -= 1
+
+
+
 #method for displaying the time passed
 def displayInfo(x, y, info): 
     timeSurf = gameFont.render(f'{info}', False, 'White')
     timeRect = timeSurf.get_rect(center = (x,y))
     screen.blit(timeSurf, timeRect)
 
+
+
 #method for event handling
 def eventLoop():
-    global thrustersOn
-    global shoot
+    global thrustersOn, shoot
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT: #Quit logic
@@ -307,20 +452,40 @@ while not gameOver:
     screen.blit(fuelImg, fuelRect)
     displayInfo(710, UICENTERY, spaceship.fuel)
 
+    #display score
+    screen.blit(coin1, coin1Rect)
+    displayInfo(1100, UICENTERY, spaceship.score)
+
     #update and draw groups
 
     #spaceship group
     spaceshipGroup.update() 
     spaceshipGroup.draw(screen)
     
+    #coins
+    spawnCoin()
+    coinGroup.update()
+    coinGroup.draw(screen)
+
+    #heart
+    spawnHeart()
+    heartGroup.update()
+    heartGroup.draw(screen)
+
+    #spawn ammo
+    spawnAmmo()
+    ammoGroup.update()
+    ammoGroup.draw(screen)
+
     #enemies
     EnemiesGroup.update()
     EnemiesGroup.draw(screen)
 
+    
+
     #bullet group
     bulletGroup.update()
     bulletGroup.draw(screen)
-
 
 
     pygame.display.update() #maintains display open
