@@ -1,8 +1,7 @@
-from pickle import TRUE
 from random import randint
-from tkinter import EventType
 import pygame
 from sys import exit
+
 
 #important vars
 WIDTH = 1300
@@ -11,7 +10,7 @@ TOPBOUND = 70
 FPS = 60
 UICENTERY = 40
 
-#pygame scree
+#pygame screen
 pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 
@@ -90,6 +89,10 @@ mainMenuImg = pygame.image.load('Images\startBackground.png').convert_alpha()
 #bullet groups
 bulletGroup = pygame.sprite.Group()
 
+#Enemies
+dripDudeImg = pygame.image.load("Images\dripGuy.png").convert_alpha()
+dripDudeExists = True
+
 #sets display variables
 pygame.display.set_caption("Rocket Shooter")
 pygame.display.set_icon(pygame.image.load('Images\spaceship.png'))
@@ -101,6 +104,37 @@ clock = pygame.time.Clock()
 bg = pygame.image.load('Images\Background.png').convert_alpha()
 bgWidth = bg.get_width()
 scroll = 0
+
+#game over screen
+
+gameOverbg = pygame.image.load("Images\gameOver.png").convert_alpha()
+gameOverbgRect = gameOverbg.get_rect(topleft = (0,0))
+
+#var
+restartScreenActive = False
+
+def RestartScreen():
+    global restartScreenActive
+    restartScreenActive =True
+
+    while restartScreenActive:
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+            
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_r:
+                    restartScreenActive = False
+                    
+        
+        screen.blit(gameOverbg, gameOverbgRect)
+
+        clock.tick(FPS)
+        pygame.display.update()
+
+    play()
 
 
 class SpaceShip(pygame.sprite.Sprite):
@@ -126,10 +160,10 @@ class SpaceShip(pygame.sprite.Sprite):
         self.score = 0
 
         #movement var
-        self.gravity = 3
+        self.gravity = 2
         self.velocity = 0
         self.damping = .8
-        self.thrust = 8
+        self.thrust = 6
         self.fuel = 10000
         self.fuelUsage = 2
 
@@ -170,6 +204,7 @@ class SpaceShip(pygame.sprite.Sprite):
     def onPlayerDeath(self):
         self.kill()
         self.alive = False
+        RestartScreen()
     
     def MoveUp(self):
         if self.fuel>=0:
@@ -187,10 +222,8 @@ class SpaceShip(pygame.sprite.Sprite):
 #end of spaceship class
 
 #spaceship group
-spaceship = SpaceShip()
+spaceship = None
 spaceshipGroup = pygame.sprite.GroupSingle()
-spaceshipGroup.add(spaceship)
-
 
 class Bullet(pygame.sprite.Sprite):
 
@@ -210,7 +243,7 @@ class Bullet(pygame.sprite.Sprite):
             self.kill()
         
         #check collision with characters
-        if pygame.sprite.spritecollide(spaceship, bulletGroup, False):
+        if pygame.sprite.groupcollide(spaceshipGroup, bulletGroup, False, False):
            if(spaceship.alive):
                 self.kill() #destroy bullet
                 spaceship.health-= 50
@@ -232,7 +265,7 @@ class Enemy(pygame.sprite.Sprite):
         self.rect.center = (x,y)
         self.health = health
         self.speed = speed
-        self.alive = TRUE
+        self.alive = True
         self.direction = -1
     
     def update(self):
@@ -248,7 +281,7 @@ class Enemy(pygame.sprite.Sprite):
            
             
 class DripGuy(Enemy):
-
+    
     def __init__(self, image, health, speed,x,y, shootCD):
         super().__init__(image, health, speed,x,y)
         self.goingUp = False
@@ -257,7 +290,13 @@ class DripGuy(Enemy):
         self.startShootcd = shootCD
 
     def update(self):
-        
+        global dripDudeExists
+         #destroys self on 0 health    
+        if self.health<=0:
+            self.alive = False
+            self.kill()
+            dripDudeExists = False
+
         #movement
         self.movement()
 
@@ -265,22 +304,25 @@ class DripGuy(Enemy):
         if self.shootCD>0:
             self.shootCD-=1
         
-        #destroys self on 0 health    
-        if self.health<=0:
-            self.alive = False
-            self.kill()
 
         if self.alive:
             self.shoot()
 
 
     def movement(self):
+
+        #moving left logic, stops at certain point
+        if(self.rect.x > WIDTH -200):
+            self.rect.x -= self.speed
+
+        #going down logic
         if(self.goingDown and self.rect.y < HEIGHT-100):
             self.rect.y += self.speed
         else:
             self.goingDown = False
             self.goingUp = True
 
+        #going up logic
         if(self.goingUp and self.rect.y > 100):
             self.rect.y -= self.speed
         else:
@@ -294,6 +336,8 @@ class DripGuy(Enemy):
             bullet = Bullet(self.rect.left-15, self.rect.bottom - 40, self.direction, purpleBullet)
             bulletGroup.add(bullet)
 #end of dripguy class
+
+dripDude =  DripGuy(dripDudeImg, 200, 8, WIDTH + 400, HEIGHT - 300, 20)
 
 #coins
 coinGroup = pygame.sprite.Group()
@@ -322,7 +366,7 @@ class Coin(pygame.sprite.Sprite):
         self.image = self.frames[int(self.index)]
 
     def collide(self):
-        if pygame.sprite.spritecollide(spaceship, coinGroup, True):
+        if pygame.sprite.groupcollide(spaceshipGroup, coinGroup,False, True):
             spaceship.score += 100
 
     def update(self):
@@ -355,7 +399,7 @@ class Ammo(NonAnimCollectables):
         super().__init__(image)
  
     def collide(self):
-        if pygame.sprite.spritecollide(spaceship, ammoGroup, True): 
+        if pygame.sprite.groupcollide(spaceshipGroup, ammoGroup,False, True): 
             spaceship.ammo += ammoAmount
 
     def update(self):
@@ -371,7 +415,7 @@ class Heart(NonAnimCollectables):
         super().__init__(image)
  
     def collide(self):
-        if pygame.sprite.spritecollide(spaceship, heartGroup, True): 
+        if pygame.sprite.groupcollide(spaceshipGroup, heartGroup, False, True): 
             spaceship.health += healthRecoverAmount
     
     def update(self):
@@ -386,20 +430,26 @@ class Fuel(NonAnimCollectables):
         super().__init__(image)
  
     def collide(self):
-        if pygame.sprite.spritecollide(spaceship, fuelGroup, True): 
-            spaceship.fuel += fuelRecoverAmount
+        if pygame.sprite.groupcollide(spaceshipGroup, fuelGroup, False, True): 
+                spaceship.fuel += fuelRecoverAmount
     
     def update(self):
         self.collide()
         self.move()
 
 
-#Enemies
-dripDudeImg = pygame.image.load("Images\dripGuy.png").convert_alpha()
-dripDude =  DripGuy(dripDudeImg, 200, 8, WIDTH -200, HEIGHT -300, 20)
+#enemies group
+DripDudeGroup = pygame.sprite.Group()    
+DripDudeGroup.add(dripDude) #makes the first one appear immediatly
 
-EnemiesGroup = pygame.sprite.Group()
-EnemiesGroup.add(dripDude)
+#spawn enemies
+def spawnDripGuy():
+    global dripDude, dripDudeExists
+    if not dripDudeExists:
+        dripDude =  DripGuy(dripDudeImg, 200, 8, WIDTH + 400, HEIGHT - 300, 20)
+        DripDudeGroup.add(dripDude)
+        dripDudeExists = True
+
 
 
 #spawn collectable functions
@@ -489,7 +539,11 @@ def eventLoop():
 gameOver = False
 
 def play():
-    global scroll
+    global scroll, spaceship
+    
+    spaceship = SpaceShip()
+    spaceshipGroup.add(spaceship)
+
     while not gameOver:
 
         eventLoop() #registers all events
@@ -549,8 +603,9 @@ def play():
         fuelGroup.draw(screen)
 
         #enemies
-        EnemiesGroup.update()
-        EnemiesGroup.draw(screen)
+        spawnDripGuy()
+        DripDudeGroup.update()
+        DripDudeGroup.draw(screen)
 
         #bullet group
         bulletGroup.update()
@@ -563,8 +618,14 @@ def play():
         clock.tick(FPS) #sets fram rate to 60
 
 
+    spaceship.kill()
+
+inMainMenu = True
+
 def mainMenu():
-    while True:
+    global inMainMenu
+
+    while inMainMenu:
         screen.blit(mainMenuImg, (0,0)) #Draws Main Menu
 
         for event in pygame.event.get():
@@ -573,8 +634,11 @@ def mainMenu():
                 exit()
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_s: #if key S is pressed then start the game
-                    play()
+                    inMainMenu = False
 
         pygame.display.update()
+        clock.tick(FPS)
+
+    play()
 
 mainMenu()
