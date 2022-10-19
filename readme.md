@@ -2,7 +2,6 @@
 Dowload Here: https://tdavies.itch.io/escape-from-planet-drip
 
 
-
 ## Code Description
 Pygame library was used to make the game. There are multiple sprite objects which are different classes. These sprite objects are added to groups to help classify their collisions. Animations are done by changing through a series of images. 
 
