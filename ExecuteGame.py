@@ -5,7 +5,7 @@ from sys import exit
 
 #important vars
 WIDTH = 1300
-HEIGHT = 800
+HEIGHT = 700
 TOPBOUND = 70
 FPS = 60
 UICENTERY = 40
@@ -50,6 +50,7 @@ explosion6 = pygame.image.load('Images\explosion\explosion6.png').convert_alpha(
 explosionIndex = 0
 explosionFrames = [explosion1, explosion2, explosion3, explosion4, explosion5, explosion6]
 explodeOnce = True
+triggerExplosion = False
 
 #coins images
 coin1 = pygame.image.load('Images\coins\Gold1.png').convert_alpha()
@@ -106,16 +107,23 @@ bgWidth = bg.get_width()
 scroll = 0
 
 #game over screen
-
+isCountingDown = False
 gameOverbg = pygame.image.load("Images\gameOver.png").convert_alpha()
 gameOverbgRect = gameOverbg.get_rect(topleft = (0,0))
 
 #var
 restartScreenActive = False
+gameOverCD = 110
+
+#spaceship group
+spaceship = None
+spaceshipGroup = pygame.sprite.GroupSingle()
 
 def RestartScreen():
-    global restartScreenActive
+    global restartScreenActive, explodeOnce
     restartScreenActive =True
+
+    explodeOnce = True # allows for explosions after respawn
 
     while restartScreenActive:
 
@@ -140,6 +148,7 @@ def RestartScreen():
 class SpaceShip(pygame.sprite.Sprite):
 
     def __init__(self):
+
         super().__init__()
 
         #initiate image
@@ -173,21 +182,15 @@ class SpaceShip(pygame.sprite.Sprite):
     def update(self):
         global startTime
 
-        if(self.health <=0):
-            self.health = 0
-            self.onPlayerDeath()
+        #will trigger restart screen
+        self.onPlayerDeath()
 
         #movement
-        if thrustersOn:
-            self.MoveUp()
+        
+        self.MoveUp()
 
         #shoot
-        if shoot:
-            self.shoot()
-
-        #decreases shot cooldown
-        if self.shootCD > 0:
-            self.shootCD -= 1
+        self.shoot()
 
         #speed of spaceship
         self.velocity = (self.damping * self.velocity) + self.gravity
@@ -200,30 +203,36 @@ class SpaceShip(pygame.sprite.Sprite):
                 self.health -= 2 #loses health when touching the ground
         elif self.rect.top <= TOPBOUND:
             self.rect.top = TOPBOUND
-        
+           
+
     def onPlayerDeath(self):
-        self.kill()
-        self.alive = False
-        RestartScreen()
+        global isCountingDown
+
+        if(self.health <=0 and self.alive):
+            isCountingDown = True
+            self.health = 0
+            self.alive = False
+            self.kill()
     
     def MoveUp(self):
-        if self.fuel>=0:
+        if self.fuel>=0 and thrustersOn:
             self.velocity -= self.thrust
             self.fuel -= self.fuelUsage
 
     def shoot(self):
-        if self.shootCD == 0 and self.ammo>0:
+        if self.shootCD == 0 and self.ammo>0 and shoot:
             self.shootCD = 20
             bullet = Bullet(self.rect.right+14, self.rect.centery, self.direction, blueBullet)
             bulletGroup.add(bullet)
             self.ammo-=1
-            
+        
+        #decreases shot cooldown
+        if self.shootCD > 0:
+            self.shootCD -= 1  
 
 #end of spaceship class
 
-#spaceship group
-spaceship = None
-spaceshipGroup = pygame.sprite.GroupSingle()
+
 
 class Bullet(pygame.sprite.Sprite):
 
@@ -335,6 +344,9 @@ class DripGuy(Enemy):
             self.shootCD = self.startShootcd
             bullet = Bullet(self.rect.left-15, self.rect.bottom - 40, self.direction, purpleBullet)
             bulletGroup.add(bullet)
+
+
+    
 #end of dripguy class
 
 dripDude =  DripGuy(dripDudeImg, 200, 8, WIDTH + 400, HEIGHT - 300, 20)
@@ -352,7 +364,7 @@ class Coin(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(center = (SPAWNX, randint(SPWANY1, SPAWNY2))) #center off screen and random y
         self.moveSpeed = COLLECTABLESMOVESPEED
         self.animSpeed = .1
-    
+        
     def move(self):
         #destroy if off screen otherwise move it fowards
         if(self.rect.x < -100):
@@ -509,8 +521,6 @@ def explosion(rect):
             explodeOnce = False
         
 
-    
-
 #method for event handling during the game
 def eventLoop():
     global thrustersOn, shoot
@@ -533,7 +543,17 @@ def eventLoop():
             if event.key == pygame.K_SPACE: # shooting (space)
                 shoot = False
 
-#MainScreen
+
+def updateCountdown():
+    global gameOverCD, isCountingDown
+    
+    if(isCountingDown):
+        gameOverCD -=1
+
+    if(gameOverCD<=0):
+        gameOverCD = 110
+        isCountingDown = False
+        RestartScreen()
 
 #Main gameplay loop
 gameOver = False
@@ -613,6 +633,8 @@ def play():
 
         if(spaceship.alive == False):
             explosion(spaceship.rect.topleft)
+
+        updateCountdown()
 
         pygame.display.update() #maintains display open
         clock.tick(FPS) #sets fram rate to 60
